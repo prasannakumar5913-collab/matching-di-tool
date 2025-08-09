@@ -385,6 +385,8 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
     }
     # Ensure we don't index out-of-range if uploaded sheet has fewer columns
     def safe_get(row, col_idx):
+        if col_idx is None:
+            return ""
         if col_idx < len(row):
             val = row[col_idx]
             return "" if pd.isna(val) else str(val).strip()
@@ -406,8 +408,8 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
         
         # --- Banner check (F vs G) - use LEFT(...,4), skip if G blank ---
         if check_banner:
-            f_val = safe_get(row, idx_map['F'])
-            g_val = safe_get(row, idx_map['G'])
+            f_val = safe_get(row, idx_map.get('F'))
+            g_val = safe_get(row, idx_map.get('G'))
             if g_val != "":
                 if f_val[:4] != g_val[:4]:
                     row_has_issue = True
@@ -418,14 +420,14 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                         'row': excel_row_index + 1,
                         'F': f_val,
                         'G': g_val,
-                        'AO': safe_get(row, idx_map['AO']),
-                        'AP': safe_get(row, idx_map['AP'])
+                        'AO': safe_get(row, idx_map.get('AO')),
+                        'AP': safe_get(row, idx_map.get('AP'))
                     })
         
         # --- State check (O & P) ---
         if check_non_us:
-            o_val = safe_get(row, idx_map['O'])
-            p_val = safe_get(row, idx_map['P'])
+            o_val = safe_get(row, idx_map.get('O'))
+            p_val = safe_get(row, idx_map.get('P'))
             if o_val != "" and o_val.upper() not in US_STATES:
                 row_has_issue = True
                 full_df.at[excel_row_index, "State_Error"] += "O-not-US"
@@ -434,8 +436,8 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                     'row': excel_row_index + 1,
                     'col': 'O',
                     'value': o_val,
-                    'AO': safe_get(row, idx_map['AO']),
-                    'AP': safe_get(row, idx_map['AP'])
+                    'AO': safe_get(row, idx_map.get('AO')),
+                    'AP': safe_get(row, idx_map.get('AP'))
                 })
             if p_val != "" and p_val.upper() not in US_STATES:
                 row_has_issue = True
@@ -448,34 +450,33 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                     'row': excel_row_index + 1,
                     'col': 'P',
                     'value': p_val,
-                    'AO': safe_get(row, idx_map['AO']),
-                    'AP': safe_get(row, idx_map['AP'])
+                    'AO': safe_get(row, idx_map.get('AO')),
+                    'AP': safe_get(row, idx_map.get('AP'))
                 })
         
         # --- Trade Error check (C column) ---
         if check_trade:
-            c_val = safe_get(row, idx_map['C'])
+            c_val = safe_get(row, idx_map.get('C'))
             # Normalize numeric like 5.0 -> "05" if possible
             c_str = c_val
             if c_str and c_str.isdigit() and len(c_str) == 1:
                 c_str = c_str.zfill(2)
             if c_str not in ["05", "03", "07"]:
-                # treat empty as error? user said "other than 05,03,07 are mismatched trade error"
-                # We'll treat blank as error too (if you want to ignore blanks, change condition accordingly)
+                # treat empty as error (change if you want to ignore blanks)
                 row_has_issue = True
                 full_df.at[excel_row_index, "Trade_Error"] = "Trade error"
                 remarks.append("Trade error")
                 results['trade_errors'].append({
                     'row': excel_row_index + 1,
                     'C': c_val,
-                    'AO': safe_get(row, idx_map['AO']),
-                    'AP': safe_get(row, idx_map['AP'])
+                    'AO': safe_get(row, idx_map.get('AO')),
+                    'AP': safe_get(row, idx_map.get('AP'))
                 })
         
         # --- Address Check (J vs K) - use LEFT(...,4), skip if K blank ---
         if check_address_cols:
-            j_val = safe_get(row, idx_map['J'])
-            k_val = safe_get(row, idx_map['K'])
+            j_val = safe_get(row, idx_map.get('J'))
+            k_val = safe_get(row, idx_map.get('K'))
             if k_val != "":
                 if j_val[:4] != k_val[:4]:
                     row_has_issue = True
@@ -485,13 +486,13 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                         'row': excel_row_index + 1,
                         'J': j_val,
                         'K': k_val,
-                        'AO': safe_get(row, idx_map['AO']),
-                        'AP': safe_get(row, idx_map['AP'])
+                        'AO': safe_get(row, idx_map.get('AO')),
+                        'AP': safe_get(row, idx_map.get('AP'))
                     })
         
         # --- Z code error (AL) ---
         if check_z_code:
-            al_val = safe_get(row, idx_map['AL'])
+            al_val = safe_get(row, idx_map.get('AL'))
             if al_val != "" and al_val not in ["777750Z", "777796Z"]:
                 row_has_issue = True
                 full_df.at[excel_row_index, "Zcode_Error"] = "Z Code error"
@@ -499,14 +500,14 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                 results['z_code_errors'].append({
                     'row': excel_row_index + 1,
                     'AL': al_val,
-                    'AO': safe_get(row, idx_map['AO']),
-                    'AP': safe_get(row, idx_map['AP'])
+                    'AO': safe_get(row, idx_map.get('AO')),
+                    'AP': safe_get(row, idx_map.get('AP'))
                 })
         
         # --- AO & AP mandatory if any mismatch ---
         if row_has_issue:
-            ao_val = safe_get(row, idx_map['AO'])
-            ap_val = safe_get(row, idx_map['AP'])
+            ao_val = safe_get(row, idx_map.get('AO'))
+            ap_val = safe_get(row, idx_map.get('AP'))
             if not ao_val or not ap_val:
                 full_df.at[excel_row_index, "AO_AP_Error"] = "AO/AP missing"
                 remarks.append("AO/AP missing")
@@ -526,8 +527,8 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
     progress_bar.empty()
     status_text.empty()
     
-    # Celebration (brief)
+    # Celebration (brief) — properly closed triple-quoted string
     st.markdown("""
-    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 1
+    <div style="position: f
 
             
