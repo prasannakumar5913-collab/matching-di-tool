@@ -1,18 +1,28 @@
 import streamlit as st
 import pandas as pd
+import time  # ✅ Needed for sleep if you still want delay
 
-st.title("🔍 My Data Validation Tool")  # Tool name
+# Always show tool name
+st.title("📊 Matching QC Tool")
 
-# Excel file uploader
+# Excel file uploader (always visible)
 uploaded_file = st.file_uploader("📂 Upload your Excel file", type=["xlsx"])
 
 if uploaded_file is not None:
     try:
         df = pd.read_excel(uploaded_file)
-        st.write("✅ File uploaded successfully!")
-        st.dataframe(df)  # Show Excel content
+        st.success("✅ File uploaded successfully!")
+        st.dataframe(df)
+
+        # Optional small delay after success (won’t crash now)
+        time.sleep(1)
+
+        # Example further processing
+        st.info("Processing data...")
+        # ... your data validation code here ...
+
     except Exception as e:
-        st.error(f"Error reading Excel file: {e}")
+        st.error(f"❌ Error reading Excel file: {e}")
 # Add custom CSS for animations and styling
 st.markdown("""
 <style>
