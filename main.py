@@ -224,7 +224,7 @@ def main():
     <div class="tool-name main-title">
         <h1 class="custom-header">
             <span style="color: #667eea;">MATCHING</span>
-            <span style="color: #764ba2; margin-left: 15px;">DI</span>
+            <span style="color: #764ba2; margin-left: 15px;">QC</span>
             <span style="color: #667eea; margin-left: 15px;">TOOL</span>
         </h1>
     </div>
