@@ -1,28 +1,18 @@
 import streamlit as st
 import pandas as pd
-import time  # ✅ Needed for sleep if you still want delay
+import io
+from validators import DataValidator
+from utils import format_validation_results, export_report
+import os
+import time
 
-# Always show tool name
-st.title("📊 Matching QC Tool")
+# Set page configuration
+st.set_page_config(
+    page_title="Matching DI Tool",
+    page_icon="🔍",
+    layout="wide"
+)
 
-# Excel file uploader (always visible)
-uploaded_file = st.file_uploader("📂 Upload your Excel file", type=["xlsx"])
-
-if uploaded_file is not None:
-    try:
-        df = pd.read_excel(uploaded_file)
-        st.success("✅ File uploaded successfully!")
-        st.dataframe(df)
-
-        # Optional small delay after success (won’t crash now)
-        time.sleep(1)
-
-        # Example further processing
-        st.info("Processing data...")
-        # ... your data validation code here ...
-
-    except Exception as e:
-        st.error(f"❌ Error reading Excel file: {e}")
 # Add custom CSS for animations and styling
 st.markdown("""
 <style>
@@ -266,10 +256,10 @@ def main():
     
     if uploaded_file is not None:
         try:
-            # Read the Excel file (keep as original for output)
+            # Read the Excel file
             with st.spinner("Loading Excel file..."):
-                df = pd.read_excel(uploaded_file, header=None)
-                st.session_state.uploaded_data = df.copy()  # keep original for outputs
+                df = pd.read_excel(uploaded_file)
+                st.session_state.uploaded_data = df
             
             # Animated success message
             st.markdown('<div class="success-animation">', unsafe_allow_html=True)
@@ -293,14 +283,35 @@ def main():
             st.markdown('<div class="data-preview">', unsafe_allow_html=True)
             st.subheader("📊 Data Preview")
             
-            # Keep your preview behaviour (show 10 rows starting from the 4th row)
+            # Create a styled dataframe starting from row 4 (actual data rows)
+            # Skip first 3 rows as they contain headers/structural info
             preview_df = df.iloc[3:13].copy()  # Show 10 rows of actual data starting from row 4
-            st.dataframe(preview_df, use_container_width=True)
+            
+            # Style the dataframe to highlight 4th column (D column) headers
+            def highlight_4th_column(df):
+                # Create an empty style dataframe
+                styles = pd.DataFrame('', index=df.index, columns=df.columns)
+                
+                # If there's a 4th column (index 3), style it
+                if len(df.columns) > 3:
+                    # Bold the 4th column header and first row
+                    styles.iloc[:, 3] = 'font-weight: bold; background-color: #f0f2f6;'
+                
+                return styles
+            
+            # Display styled dataframe
+            styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
+            st.dataframe(styled_df, use_container_width=True)
+            
+            # Show information about data structure
+            st.info(f"📌 Data Structure:** First 3 rows contain headers/structural information and are excluded from validation. Column D (4th column): {df.columns[3] if len(df.columns) > 3 else 'N/A'} - highlighted for reference")
             st.markdown('</div>', unsafe_allow_html=True)
             
+
+
             # Validation settings with animation
             st.markdown('<div class="validation-section">', unsafe_allow_html=True)
-            st.header("⚙️ Validation Settings")
+            st.header("⚙ Validation Settings")
             
             # Primary validations
             st.subheader("🎯 Primary Validations")
@@ -320,6 +331,9 @@ def main():
                 st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
             
+
+            
+
             # Run validation button
             if st.button("🚀 Run Validation", type="primary", use_container_width=True):
                 run_validation(
@@ -339,363 +353,191 @@ def main():
     if st.session_state.validation_results is not None:
         display_validation_results()
 
-# --- Helper: US states set (two-letter codes)
-US_STATES = set([
-    'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA',
-    'ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK',
-    'OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC'
-])
-
 def run_validation(df, check_banner, check_trade, check_address_cols, check_z_code, check_non_us):
-    """Run the data validation process with your updated rules.
-       - df: the original dataframe read header=None (so we keep first 3 rows)
-       - We skip first 3 rows for validation but keep them in output
-    """
+    """Run the data validation process"""
+    
+    # Animated progress bar
     progress_bar = st.progress(0)
     status_text = st.empty()
     
+    # Step 1: Initialize
     status_text.text("🔧 Initializing validation engine...")
-    progress_bar.progress(10)
-    time.sleep(0.3)
-    
-    status_text.text("📊 Preparing data for validation...")
-    progress_bar.progress(30)
-    time.sleep(0.3)
-    
-    # Work on a copy to avoid mutating original state directly
-    full_df = df.copy().reset_index(drop=True)  # original raw (header rows included)
-    
-    # ensure enough columns - if file is narrower, we won't crash
-    ncols = full_df.shape[1]
-    
-    # Create error columns (default empty)
-    for col in ["Banner_Error", "Address_Error", "Trade_Error", "State_Error", "Zcode_Error", "AO_AP_Error", "Remarks"]:
-        full_df[col] = ""
-    
-    # We'll validate rows starting from the 4th row (index 3)
-    if len(full_df) <= 3:
-        st.error("No data rows to validate after skipping first 3 rows.")
-        return
-    
-    data_df = full_df.iloc[3:].reset_index(drop=True)  # data rows for validation
-    progress_bar.progress(50)
-    status_text.text("🔍 Running validation checks...")
-    time.sleep(0.3)
-    
-    # Column index mapping (0-based) by Excel letter positions:
-    # A=0, B=1, ... so:
-    idx_map = {
-        'C': 2,   # Trade
-        'F': 5, 'G': 6,   # Banner (F=client banner, G=matched)
-        'I': 8, 'J': 9, 'K': 10,  # Address: I (client came info?), J/K as asked (we'll use J & K)
-        'O': 14, 'P': 15,  # States
-        'AL': 37,  # Z Code
-        'AO': 40, 'AP': 41  # AO/AP job id & client store (mandatory on mismatch)
-    }
-    # Ensure we don't index out-of-range if uploaded sheet has fewer columns
-    def safe_get(row, col_idx):
-        if col_idx is None:
-            return ""
-        if col_idx < len(row):
-            val = row[col_idx]
-            return "" if pd.isna(val) else str(val).strip()
-        return ""
-    
-    # Results dict for display_validation_results (same keys used earlier)
-    results = {
-        'banner_mismatches': [],
-        'trade_errors': [],
-        'address_column_mismatches': [],
-        'z_code_errors': [],
-        'non_us_states': []
-    }
-    
-    for i, row in data_df.iterrows():
-        excel_row_index = i + 3  # index in full_df (0-based)
-        remarks = []
-        row_has_issue = False
-        
-        # --- Banner check (F vs G) - use LEFT(...,4), skip if G blank ---
-        if check_banner:
-            f_val = safe_get(row, idx_map.get('F'))
-            g_val = safe_get(row, idx_map.get('G'))
-            if g_val != "":
-                if f_val[:4] != g_val[:4]:
-                    row_has_issue = True
-                    full_df.at[excel_row_index, "Banner_Error"] = "Banner mismatch"
-                    remarks.append("Banner mismatch")
-                    # record into results (1-based excel row)
-                    results['banner_mismatches'].append({
-                        'row': excel_row_index + 1,
-                        'F': f_val,
-                        'G': g_val,
-                        'AO': safe_get(row, idx_map.get('AO')),
-                        'AP': safe_get(row, idx_map.get('AP'))
-                    })
-        
-        # --- State check (O & P) ---
-        if check_non_us:
-            o_val = safe_get(row, idx_map.get('O'))
-            p_val = safe_get(row, idx_map.get('P'))
-            if o_val != "" and o_val.upper() not in US_STATES:
-                row_has_issue = True
-                full_df.at[excel_row_index, "State_Error"] += "O-not-US"
-                remarks.append("State outside US (O)")
-                results['non_us_states'].append({
-                    'row': excel_row_index + 1,
-                    'col': 'O',
-                    'value': o_val,
-                    'AO': safe_get(row, idx_map.get('AO')),
-                    'AP': safe_get(row, idx_map.get('AP'))
-                })
-            if p_val != "" and p_val.upper() not in US_STATES:
-                row_has_issue = True
-                if full_df.at[excel_row_index, "State_Error"]:
-                    full_df.at[excel_row_index, "State_Error"] += "; P-not-US"
-                else:
-                    full_df.at[excel_row_index, "State_Error"] = "P-not-US"
-                remarks.append("State outside US (P)")
-                results['non_us_states'].append({
-                    'row': excel_row_index + 1,
-                    'col': 'P',
-                    'value': p_val,
-                    'AO': safe_get(row, idx_map.get('AO')),
-                    'AP': safe_get(row, idx_map.get('AP'))
-                })
-        
-        # --- Trade Error check (C column) ---
-        if check_trade:
-            c_val = safe_get(row, idx_map.get('C'))
-            # Normalize numeric like 5.0 -> "05" if possible
-            c_str = c_val
-            if c_str and c_str.isdigit() and len(c_str) == 1:
-                c_str = c_str.zfill(2)
-            if c_str not in ["05", "03", "07"]:
-                # treat empty as error (change if you want to ignore blanks)
-                row_has_issue = True
-                full_df.at[excel_row_index, "Trade_Error"] = "Trade error"
-                remarks.append("Trade error")
-                results['trade_errors'].append({
-                    'row': excel_row_index + 1,
-                    'C': c_val,
-                    'AO': safe_get(row, idx_map.get('AO')),
-                    'AP': safe_get(row, idx_map.get('AP'))
-                })
-        
-        # --- Address Check (J vs K) - use LEFT(...,4), skip if K blank ---
-        if check_address_cols:
-            j_val = safe_get(row, idx_map.get('J'))
-            k_val = safe_get(row, idx_map.get('K'))
-            if k_val != "":
-                if j_val[:4] != k_val[:4]:
-                    row_has_issue = True
-                    full_df.at[excel_row_index, "Address_Error"] = "Address mismatch"
-                    remarks.append("Address mismatch")
-                    results['address_column_mismatches'].append({
-                        'row': excel_row_index + 1,
-                        'J': j_val,
-                        'K': k_val,
-                        'AO': safe_get(row, idx_map.get('AO')),
-                        'AP': safe_get(row, idx_map.get('AP'))
-                    })
-        
-        # --- Z code error (AL) ---
-        if check_z_code:
-            al_val = safe_get(row, idx_map.get('AL'))
-            if al_val != "" and al_val not in ["777750Z", "777796Z"]:
-                row_has_issue = True
-                full_df.at[excel_row_index, "Zcode_Error"] = "Z Code error"
-                remarks.append("Z Code error")
-                results['z_code_errors'].append({
-                    'row': excel_row_index + 1,
-                    'AL': al_val,
-                    'AO': safe_get(row, idx_map.get('AO')),
-                    'AP': safe_get(row, idx_map.get('AP'))
-                })
-        
-        # --- AO & AP mandatory if any mismatch ---
-        if row_has_issue:
-            ao_val = safe_get(row, idx_map.get('AO'))
-            ap_val = safe_get(row, idx_map.get('AP'))
-            if not ao_val or not ap_val:
-                full_df.at[excel_row_index, "AO_AP_Error"] = "AO/AP missing"
-                remarks.append("AO/AP missing")
-        
-        # Set combined remarks column
-        if remarks:
-            full_df.at[excel_row_index, "Remarks"] = "; ".join(remarks)
-    
-    # Save results to session state for display
-    st.session_state.validation_results = results
-    st.session_state.uploaded_data = full_df  # full_df contains original rows + error cols
-    
-    # Finish progress
-    progress_bar.progress(100)
-    status_text.text("✅ Validation completed successfully!")
+    progress_bar.progress(20)
     time.sleep(0.5)
-    progress_bar.empty()
-    status_text.empty()
     
+    # Step 2: Load data
+    status_text.text("📊 Loading and analyzing data...")
+    progress_bar.progress(40)
+    time.sleep(0.5)
     
-    # Celebration (brief) — properly closed triple-quoted string
+    # Step 3: Run validations
+    status_text.text("🔍 Running validation checks...")
+    progress_bar.progress(60)
+    time.sleep(0.5)
+    
+    with st.spinner("Processing validation results..."):
+        # Initialize validator
+        validator = DataValidator()
+        
+        # Run validations
+        results = validator.validate_data(
+            df, 
+            {},  # No column mapping needed for primary validations
+            {
+                'banner_mismatches': check_banner,
+                'trade_errors': check_trade,
+                'address_column_mismatches': check_address_cols,
+                'z_code_errors': check_z_code,
+                'non_us_states': check_non_us
+            }
+        )
+        
+        # Complete progress
+        status_text.text("✅ Validation completed successfully!")
+        progress_bar.progress(100)
+        time.sleep(0.5)
+        
+        # Clear progress indicators
+        progress_bar.empty()
+        status_text.empty()
+        
+        st.session_state.validation_results = results
+    
+    # Fireworks celebration effect
     st.markdown("""
-<div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
-    <div class="fireworks">
-        <div class="firework"></div>
-        <div class="firework"></div>
-        <div class="firework"></div>
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
+        <div class="fireworks">
+            <div class="firework"></div>
+            <div class="firework"></div>
+            <div class="firework"></div>
+        </div>
     </div>
-</div>
-<style>
-.fireworks { position: relative; width: 100%; height: 100%; }
-.firework { position: absolute; width: 4px; height: 4px; background: #ff6b6b; border-radius: 50%; animation: firework 2s ease-out;}
-.firework:nth-child(1){ left:20%; top:30%; background: #4ecdc4;}
-.firework:nth-child(2){ left:60%; top:20%; background: #45b7d1;}
-.firework:nth-child(3){ left:80%; top:40%; background: #ff6b6b;}
-@keyframes firework { 0% { transform: scale(1); opacity:1;} 50%{ transform: scale(20); opacity:0.7;} 100%{ transform: scale(40); opacity:0;} }
-</style>
-""", unsafe_allow_html=True)
-
-st.success("✅ Validation completed! Results are ready for review.")
-time.sleep(1)
-st.rerun()
+    
+    <style>
+    .fireworks {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .firework {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: #ff6b6b;
+        border-radius: 50%;
+        animation: firework 2s ease-out;
+    }
+    
+    .firework:nth-child(1) {
+        left: 20%;
+        top: 30%;
+        animation-delay: 0s;
+        background: #4ecdc4;
+    }
+    
+    .firework:nth-child(2) {
+        left: 60%;
+        top: 20%;
+        animation-delay: 0.5s;
+        background: #45b7d1;
+    }
+    
+    .firework:nth-child(3) {
+        left: 80%;
+        top: 40%;
+        animation-delay: 1s;
+        background: #ff6b6b;
+    }
+    
+    @keyframes firework {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(20); opacity: 0.7; }
+        100% { transform: scale(40); opacity: 0; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    st.success("✅ Validation completed! Results are ready for review.")
+    time.sleep(2)  # Show fireworks for 2 seconds
+    st.rerun()
 
 def display_validation_results():
     """Display the validation results"""
     results = st.session_state.validation_results
-    full_df = st.session_state.uploaded_data
-
+    
     st.header("📋 Validation Results")
-
+    
     # Summary metrics with light styling
     total_issues = sum(len(issues) for issues in results.values())
-
+    
     st.markdown('<div class="validation-summary">', unsafe_allow_html=True)
     col1, col2, col3, col4 = st.columns(4)
-
+    
     with col1:
         st.metric("Total Issues Found", total_issues)
     with col2:
-        st.metric("Total Records Checked", len(full_df) - 3 if full_df is not None else 0)
+        st.metric("Total Records Checked", len(st.session_state.uploaded_data))
     with col3:
-        total_rows = len(full_df) - 3 if full_df is not None else 0
-        issue_rate = (total_issues / total_rows) * 100 if total_rows > 0 else 0
+        issue_rate = (total_issues / len(st.session_state.uploaded_data)) * 100 if len(st.session_state.uploaded_data) > 0 else 0
         st.metric("Issue Rate", f"{issue_rate:.1f}%")
     with col4:
+        # Calculate clean records by getting unique row numbers with issues
         rows_with_issues = set()
         for issues in results.values():
             if issues:
                 for issue in issues:
                     if isinstance(issue, dict) and 'row' in issue:
                         rows_with_issues.add(issue['row'])
-        clean_records = (len(full_df) - 3) - len(rows_with_issues) if full_df is not None else 0
+                    elif isinstance(issue, dict) and 'rows' in issue:
+                        rows_with_issues.update(issue['rows'])
+        clean_records = len(st.session_state.uploaded_data) - len(rows_with_issues)
         st.metric("Clean Records", clean_records)
     st.markdown('</div>', unsafe_allow_html=True)
-
+    
     # Detailed results
     st.subheader("🔍 Detailed Issues")
+    
     for check_type, issues in results.items():
         if issues:
             with st.expander(f"{check_type.replace('_', ' ').title()} ({len(issues)} issues)", expanded=False):
                 st.markdown('<div class="validation-report-box">', unsafe_allow_html=True)
                 if isinstance(issues, list) and len(issues) > 0:
                     if isinstance(issues[0], dict):
+                        # Display as DataFrame for structured data
                         issues_df = pd.DataFrame(issues)
                         st.dataframe(issues_df, use_container_width=True)
                     else:
+                        # Display as simple list
                         for i, issue in enumerate(issues, 1):
                             st.write(f"{i}. {issue}")
                 else:
                     st.write("No specific details available for these issues.")
                 st.markdown('</div>', unsafe_allow_html=True)
-
-    # Show preview of validated data (first 20 rows) including error columns
-    st.subheader("Preview of validated data (first 20 rows)")
-    st.dataframe(full_df.head(20), use_container_width=True)
-
-    # Export functionality: Excel with highlights and CSV summary
+    
+    # Export functionality
     st.subheader("📤 Export Report")
     col1, col2 = st.columns(2)
-
+    
     with col1:
-        if st.button("📊 Download Detailed Report (Excel)", use_container_width=True):
-            out = io.BytesIO()
-            with pd.ExcelWriter(out, engine='xlsxwriter') as writer:
-                full_df.to_excel(writer, index=False, sheet_name='Validation')
-                workbook = writer.book
-                worksheet = writer.sheets['Validation']
-
-                # freeze top 4 rows (header + first 3 structural rows)
-                worksheet.freeze_panes(4, 0)
-
-                # formats
-                red_fmt = workbook.add_format({'bg_color': '#FFC7CE'})  # light red fill
-                header_fmt = workbook.add_format({'bold': True})
-
-                # set header format (iterate columns)
-                for col_num, value in enumerate(full_df.columns.values):
-                    worksheet.write(0, col_num, str(value), header_fmt)
-
-                # helper: convert Excel letter to 0-based index
-                def col_index_for_letter(letter):
-                    letter = letter.upper()
-                    result = 0
-                    for ch in letter:
-                        result = result * 26 + (ord(ch) - ord('A') + 1)
-                    return result - 1
-
-                highlight_map = {
-                    'Banner_Error': ['F', 'G'],
-                    'Address_Error': ['J', 'K'],
-                    'Trade_Error': ['C'],
-                    'State_Error': ['O', 'P'],
-                    'Zcode_Error': ['AL'],
-                    'AO_AP_Error': ['AO', 'AP']
-                }
-
-                # highlight target cells if corresponding error cell filled
-                for r in range(len(full_df)):
-                    for err_col, letters in highlight_map.items():
-                        if err_col in full_df.columns and str(full_df.at[r, err_col]).strip():
-                            for letter in letters:
-                                cidx = col_index_for_letter(letter)
-                                if 0 <= cidx < full_df.shape[1]:
-                                    try:
-                                        worksheet.write(r + 1, cidx, full_df.iat[r, cidx], red_fmt)
-                                    except Exception:
-                                        pass
-
-            data = out.getvalue()
+        if st.button("📊 Download Detailed Report", use_container_width=True):
+            report_data = export_report(st.session_state.uploaded_data, results)
             st.download_button(
-                label="💾 Download Excel with highlights",
-                data=data,
-                file_name="validation_report_highlighted.xlsx",
+                label="💾 Download Excel Report",
+                data=report_data,
+                file_name="validation_report.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-
+    
     with col2:
-        if st.button("📋 Download Summary Report (CSV)", use_container_width=True):
-            # build flat summary
-            summaries = []
-            for check_type, issues in results.items():
-                for issue in issues:
-                    entry = {'check_type': check_type}
-                    entry.update(issue)
-                    summaries.append(entry)
-            if summaries:
-                summary_df = pd.DataFrame(summaries)
-            else:
-                summary_df = pd.DataFrame(columns=['check_type'])
-            csv_bytes = summary_df.to_csv(index=False).encode('utf-8')
+        if st.button("📋 Download Summary Report", use_container_width=True):
+            summary_report = format_validation_results(results)
             st.download_button(
                 label="💾 Download Summary (CSV)",
-                data=csv_bytes,
+                data=summary_report.to_csv(index=False),
                 file_name="validation_summary.csv",
                 mime="text/csv"
             )
-if __name__ == "__main__":
+
+if _name_ == "_main_":
     main()
-
-
-
-                                
