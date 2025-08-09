@@ -299,14 +299,7 @@ def main():
                 
                 return styles
             
-            # Display styled dataframe
-            styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
-            st.dataframe(styled_df, use_container_width=True)
-            
-            # Show information about data structure
-            st.info(f"**📌 Data Structure:** First 3 rows contain headers/structural information and are excluded from validation. Column D (4th column): {df.columns[3] if len(df.columns) > 3 else 'N/A'} - highlighted for reference")
-            st.markdown('</div>', unsafe_allow_html=True)
-            
+        
 
 
             # Validation settings with animation
