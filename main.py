@@ -528,8 +528,8 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
     status_text.empty()
     
     
-    # Celebration (brief) — properly closed triple-quoted string
-    st.markdown("""
+   # Celebration (brief) — properly closed triple-quoted string
+    st.markdown(""" ...fireworks html... """, unsafe_allow_html=True)
     <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
         <div class="fireworks">
             <div class="firework"></div>
