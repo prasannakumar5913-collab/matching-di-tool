@@ -1,4 +1,11 @@
+<<<<<<< HEAD
 streamlit
 pandas
 openpyxl
 validators
+=======
+streamlit
+pandas
+openpyxl
+validators
+>>>>>>> b33c5470e587ca56ea1ef7ed1f693479d30c8f68
