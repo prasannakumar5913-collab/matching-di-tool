@@ -8,7 +8,7 @@ import time
 
 # Set page configuration
 st.set_page_config(
-    page_title="Matching DI Tool",
+    page_title="Matching QC Tool",
     page_icon="🔍",
     layout="wide"
 )
@@ -303,9 +303,7 @@ def main():
             styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
             st.dataframe(styled_df, use_container_width=True)
             
-            # Show information about data structure
-            st.info(f"📌 Data Structure:** First 3 rows contain headers/structural information and are excluded from validation. Column D (4th column): {df.columns[3] if len(df.columns) > 3 else 'N/A'} - highlighted for reference")
-            st.markdown('</div>', unsafe_allow_html=True)
+      
             
 
 
@@ -539,4 +537,5 @@ def display_validation_results():
                 mime="text/csv"
             )
 
-
+if _name_ == "_main_":
+    main()
