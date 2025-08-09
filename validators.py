@@ -1,3 +1,5 @@
+import pandas as pd
+
 class DataValidator:
     def validate_data(self, df, column_mapping, checks):
         results = {}
