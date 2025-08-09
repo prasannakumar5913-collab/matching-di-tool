@@ -1,5 +1,66 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
+from io import BytesIO
+
+# ==============================
+# Page Config
+# ==============================
+st.set_page_config(
+    page_title="Matching DI Tool",
+    page_icon="🔍",
+    layout="wide"
+)
+
+# ==============================
+# Custom Styling (Light Mode + Hide Branding)
+# ==============================
+st.markdown("""
+    <style>
+    /* Force light background */
+    .stApp {
+        background-color: white !important;
+        color: black !important;
+    }
+
+    /* Ensure all text is dark */
+    html, body, [class*="css"] {
+        color: black !important;
+    }
+
+    /* Headings */
+    h1, h2, h3, h4, h5, h6 {
+        color: #222 !important;
+    }
+
+    /* Metric styling */
+    .stMetric {
+        background-color: #f8f9fa !important;
+        color: black !important;
+        border-radius: 10px;
+        padding: 10px;
+    }
+
+    /* Hide Streamlit default menu/footer/header */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
+
+# ==============================
+# Your Existing Code Starts Here
+# ==============================
+st.title("Matching DI Tool")
+
+uploaded_file = st.file_uploader("Upload Excel File", type=["xlsx"])
+if uploaded_file is not None:
+    try:
+        df = pd.read_excel(uploaded_file, engine="openpyxl")
+        st.write("Preview of Uploaded Data:")
+        st.dataframe(df)
+    except Exception as e:
+        st.error(f"❌ Error reading Excel file: {e}")
 from validators import DataValidator
 
 df = pd.DataFrame({
