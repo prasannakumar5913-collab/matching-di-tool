@@ -1,6 +1,27 @@
 import streamlit as st
 import pandas as pd
-import io
+from validators import DataValidator
+
+df = pd.DataFrame({
+    'F': ['ABCD123', 'ABCD456', 'WXYZ789'],
+    'G': ['ABCD999', 'WXYZ000', 'WXYZ111'],
+    'C': ['05', '99', '03'],
+    'J': ['ADDR1', 'ADDR2', 'ADDR3'],
+    'K': ['ADDR1', 'ADDRX', 'ADDR3'],
+    'AL': ['777750Z', 'BADCODE', '777796Z'],
+    'O': ['CA', 'XX', 'NY'],
+    'P': ['TX', 'ZZ', 'FL']
+})
+checks = {
+    'banner_mismatches': True,
+    'trade_errors': True,
+    'address_column_mismatches': True,
+    'z_code_errors': True,
+    'non_us_states': True
+}
+validator = DataValidator()
+results = validator.validate_data(df, {}, checks)
+print(results)
 from validators import DataValidator
 from utils import format_validation_results, export_report
 import os
