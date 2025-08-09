@@ -527,22 +527,169 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
     progress_bar.empty()
     status_text.empty()
     
+    
     # Celebration (brief) — properly closed triple-quoted string
     st.markdown("""
-<style>
-/* Your animation and decoration CSS here */
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
+        <div class="fireworks">
+            <div class="firework"></div>
+            <div class="firework"></div>
+            <div class="firework"></div>
+        </div>
+    </div>
+    <style>
+    .fireworks { position: relative; width: 100%; height: 100%; }
+    .firework { position: absolute; width: 4px; height: 4px; background: #ff6b6b; border-radius: 50%; animation: firework 2s ease-out;}
+    .firework:nth-child(1){ left:20%; top:30%; background: #4ecdc4;}
+    .firework:nth-child(2){ left:60%; top:20%; background: #45b7d1;}
+    .firework:nth-child(3){ left:80%; top:40%; background: #ff6b6b;}
+    @keyframes firework { 0% { transform: scale(1); opacity:1;} 50%{ transform: scale(20); opacity:0.7;} 100%{ transform: scale(40); opacity:0;} }
+    </style>
+    """, unsafe_allow_html=True)
 
-/* Example: fade-in animation */
-@keyframes fadeInDown {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+st.success("✅ Validation completed! Results are ready for review.")
+    time.sleep(1)
+    st.rerun()
 
-/* Apply animation to main title */
-h1 {
-    animation: fadeInDown 1s ease-out;
-}
-</style>
-""", unsafe_allow_html=True)
 
-            
+def display_validation_results():
+    """Display the validation results"""
+    results = st.session_state.validation_results
+    full_df = st.session_state.uploaded_data
+
+    st.header("📋 Validation Results")
+
+    # Summary metrics with light styling
+    total_issues = sum(len(issues) for issues in results.values())
+
+    st.markdown('<div class="validation-summary">', unsafe_allow_html=True)
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Total Issues Found", total_issues)
+    with col2:
+        st.metric("Total Records Checked", len(full_df) - 3 if full_df is not None else 0)
+    with col3:
+        total_rows = len(full_df) - 3 if full_df is not None else 0
+        issue_rate = (total_issues / total_rows) * 100 if total_rows > 0 else 0
+        st.metric("Issue Rate", f"{issue_rate:.1f}%")
+    with col4:
+        rows_with_issues = set()
+        for issues in results.values():
+            if issues:
+                for issue in issues:
+                    if isinstance(issue, dict) and 'row' in issue:
+                        rows_with_issues.add(issue['row'])
+        clean_records = (len(full_df) - 3) - len(rows_with_issues) if full_df is not None else 0
+        st.metric("Clean Records", clean_records)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Detailed results
+    st.subheader("🔍 Detailed Issues")
+    for check_type, issues in results.items():
+        if issues:
+            with st.expander(f"{check_type.replace('_', ' ').title()} ({len(issues)} issues)", expanded=False):
+                st.markdown('<div class="validation-report-box">', unsafe_allow_html=True)
+                if isinstance(issues, list) and len(issues) > 0:
+                    if isinstance(issues[0], dict):
+                        issues_df = pd.DataFrame(issues)
+                        st.dataframe(issues_df, use_container_width=True)
+                    else:
+                        for i, issue in enumerate(issues, 1):
+                            st.write(f"{i}. {issue}")
+                else:
+                    st.write("No specific details available for these issues.")
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    # Show preview of validated data (first 20 rows) including error columns
+    st.subheader("Preview of validated data (first 20 rows)")
+    st.dataframe(full_df.head(20), use_container_width=True)
+
+    # Export functionality: Excel with highlights and CSV summary
+    st.subheader("📤 Export Report")
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("📊 Download Detailed Report (Excel)", use_container_width=True):
+            out = io.BytesIO()
+            # write excel with highlights
+            with pd.ExcelWriter(out, engine='xlsxwriter') as writer:
+                full_df.to_excel(writer, index=False, sheet_name='Validation')
+                workbook = writer.book
+                worksheet = writer.sheets['Validation']
+
+                # freeze top 4 rows (header + first 3 structural rows)
+                worksheet.freeze_panes(4, 0)
+
+                # formats
+                red_fmt = workbook.add_format({'bg_color': '#FFC7CE'})  # light red fill
+                header_fmt = workbook.add_format({'bold': True})
+
+                # set header format (iterate columns)
+                for col_num, value in enumerate(full_df.columns.values):
+                    worksheet.write(0, col_num, str(value), header_fmt)
+
+                # helper: convert Excel letter to 0-based index
+                def col_index_for_letter(letter):
+                    letter = letter.upper()
+                    result = 0
+                    for ch in letter:
+                        result = result * 26 + (ord(ch) - ord('A') + 1)
+                    return result - 1
+highlight_map = {
+                    'Banner_Error': ['F', 'G'],
+                    'Address_Error': ['J', 'K'],
+                    'Trade_Error': ['C'],
+                    'State_Error': ['O', 'P'],
+                    'Zcode_Error': ['AL'],
+                    'AO_AP_Error': ['AO', 'AP']
+                }
+
+                # highlight target cells if corresponding error cell filled
+                for r in range(len(full_df)):
+                    for err_col, letters in highlight_map.items():
+                        if err_col in full_df.columns and str(full_df.at[r, err_col]).strip():
+                            for letter in letters:
+                                cidx = col_index_for_letter(letter)
+                                if 0 <= cidx < full_df.shape[1]:
+                                    # write value back with red format
+                                    try:
+                                        worksheet.write(r + 1, cidx, full_df.iat[r, cidx], red_fmt)
+                                    except Exception:
+                                        # if the original cell is not straightforward to write, skip silently
+                                        pass
+
+            data = out.getvalue()
+            st.download_button(
+                label="💾 Download Excel with highlights",
+                data=data,
+                file_name="validation_report_highlighted.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+    with col2:
+        if st.button("📋 Download Summary Report (CSV)", use_container_width=True):
+            # build flat summary
+            summaries = []
+            for check_type, issues in results.items():
+                for issue in issues:
+                    entry = {'check_type': check_type}
+                    entry.update(issue)
+                    summaries.append(entry)
+            if summaries:
+                summary_df = pd.DataFrame(summaries)
+            else:
+                summary_df = pd.DataFrame(columns=['check_type'])
+            csv_bytes = summary_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="💾 Download Summary (CSV)",
+                data=csv_bytes,
+                file_name="validation_summary.csv",
+                mime="text/csv"
+            )
+if __name__ == "__main__":
+    main()
+
+
+
+                                
