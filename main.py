@@ -529,6 +529,20 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
     
     # Celebration (brief) — properly closed triple-quoted string
     st.markdown("""
-    <div style="position: f
+<style>
+/* Your animation and decoration CSS here */
+
+/* Example: fade-in animation */
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Apply animation to main title */
+h1 {
+    animation: fadeInDown 1s ease-out;
+}
+</style>
+""", unsafe_allow_html=True)
 
             
