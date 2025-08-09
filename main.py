@@ -1,27 +1,6 @@
 import streamlit as st
 import pandas as pd
-from validators import DataValidator
-
-df = pd.DataFrame({
-    'F': ['ABCD123', 'ABCD456', 'WXYZ789'],
-    'G': ['ABCD999', 'WXYZ000', 'WXYZ111'],
-    'C': ['05', '99', '03'],
-    'J': ['ADDR1', 'ADDR2', 'ADDR3'],
-    'K': ['ADDR1', 'ADDRX', 'ADDR3'],
-    'AL': ['777750Z', 'BADCODE', '777796Z'],
-    'O': ['CA', 'XX', 'NY'],
-    'P': ['TX', 'ZZ', 'FL']
-})
-checks = {
-    'banner_mismatches': True,
-    'trade_errors': True,
-    'address_column_mismatches': True,
-    'z_code_errors': True,
-    'non_us_states': True
-}
-validator = DataValidator()
-results = validator.validate_data(df, {}, checks)
-print(results)
+import io
 from validators import DataValidator
 from utils import format_validation_results, export_report
 import os
@@ -35,12 +14,232 @@ st.set_page_config(
 )
 
 # Add custom CSS for animations and styling
+st.markdown("""
+<style>
+    /* Main title animation */
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-50px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(50px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    @keyframes glow {
+        0% { box-shadow: 0 0 5px rgba(51, 51, 255, 0.3); }
+        50% { box-shadow: 0 0 20px rgba(51, 51, 255, 0.6); }
+        100% { box-shadow: 0 0 5px rgba(51, 51, 255, 0.3); }
+    }
+    
+    /* Apply animations to specific elements */
+    .main-title {
+        animation: fadeInDown 1s ease-out;
+    }
+    
+    .metric-container {
+        animation: slideInLeft 0.8s ease-out;
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-container:hover {
+        transform: translateY(-5px);
+    }
+    
+    .validation-section {
+        animation: slideInRight 1s ease-out;
+    }
+    
+    .stButton > button {
+        animation: pulse 2s infinite;
+        transition: all 0.3s ease;
+        border-radius: 10px;
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        color: white;
+        border: none;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stButton > button:hover {
+        animation: none;
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .upload-area {
+        border: 3px dashed #4ECDC4;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(78, 205, 196, 0.1), rgba(255, 107, 107, 0.1));
+        animation: glow 3s infinite;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-area:hover {
+        transform: scale(1.02);
+        border-color: #FF6B6B;
+    }
+    
+    .success-animation {
+        animation: slideInLeft 0.5s ease-out;
+    }
+    
+    .checkbox-container {
+        transition: all 0.3s ease;
+        padding: 10px;
+        border-radius: 8px;
+    }
+    
+    .checkbox-container:hover {
+        background-color: rgba(78, 205, 196, 0.1);
+        transform: translateX(10px);
+    }
+    
+    .data-preview {
+        animation: fadeInDown 1.2s ease-out;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Progress bar animation */
+    .stProgress > div > div {
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1);
+        background-size: 300% 300%;
+        animation: gradientMove 2s ease infinite;
+    }
+    
+    @keyframes gradientMove {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    /* Custom header styling */
+    .custom-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 3.5rem;
+        font-weight: 900;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        letter-spacing: 2px;
+        text-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .tool-name {
+        display: block;
+        position: relative;
+        text-align: center;
+        width: 100%;
+        margin: 0 auto 2rem auto;
+        padding: 20px 40px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border-radius: 20px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+        backdrop-filter: blur(10px);
+    }
+    
+    .tool-name::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 20px;
+        z-index: -1;
+        opacity: 0.1;
+        animation: borderGlow 3s ease-in-out infinite alternate;
+    }
+    
+    @keyframes borderGlow {
+        0% { opacity: 0.1; transform: scale(1); }
+        100% { opacity: 0.3; transform: scale(1.02); }
+    }
+    
+    /* Floating elements */
+    .floating-icon {
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    /* Hide copy buttons throughout the app */
+    button[title="Copy to clipboard"] {
+        display: none !important;
+    }
+    
+    .copy-to-clipboard {
+        display: none !important;
+    }
+    
+    /* Light colored validation report styling */
+    .validation-summary {
+        background: linear-gradient(135deg, #f8f9ff 0%, #e8f4f8 100%);
+        border: 2px solid #d1e7f0;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .validation-report-box {
+        background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+        border: 1px solid #b3d9ff;
+        border-radius: 12px;
+        padding: 15px;
+        margin: 10px 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
+</style>
+""", unsafe_allow_html=True)
 
 def main():
     # Professional animated title with enhanced styling
-        
+    st.markdown('''
+    <div class="tool-name main-title">
+        <h1 class="custom-header">
+            <span style="color: #667eea;">MATCHING</span>
+            <span style="color: #764ba2; margin-left: 15px;">DI</span>
+            <span style="color: #667eea; margin-left: 15px;">TOOL</span>
+        </h1>
+    </div>
+    ''', unsafe_allow_html=True)
+    
     # Animated subtitle with floating icon
-        
+    st.markdown("""
+    <div style="text-align: center; margin-bottom: 2rem;">
+        <span class="floating-icon" style="font-size: 2rem;">📊</span>
+        <p style="font-size: 1.2rem; color: #666; margin-top: 1rem;">
+            Upload an Excel file to perform comprehensive data validation including address checks and data quality analysis
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
     # Initialize session state
     if 'validation_results' not in st.session_state:
         st.session_state.validation_results = None
@@ -69,12 +268,14 @@ def main():
             
             # Display basic file information with animation
             st.markdown('<div class="metric-container">', unsafe_allow_html=True)
-            col1, col2, col3 = st.columns(3)
+            col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total Rows", len(df), delta=None)
             with col2:
-                st.metric("Total Columns", len(df.columns), delta=None)
+                st.metric("Data Rows", len(df) - 3 if len(df) > 3 else 0, delta=None)
             with col3:
+                st.metric("Total Columns", len(df.columns), delta=None)
+            with col4:
                 st.metric("File Size", f"{uploaded_file.size / 1024:.1f} KB", delta=None)
             st.markdown('</div>', unsafe_allow_html=True)
             
@@ -82,8 +283,9 @@ def main():
             st.markdown('<div class="data-preview">', unsafe_allow_html=True)
             st.subheader("📊 Data Preview")
             
-            # Create a styled dataframe with 4th column headers in bold
-            preview_df = df.head(10).copy()
+            # Create a styled dataframe starting from row 4 (actual data rows)
+            # Skip first 3 rows as they contain headers/structural info
+            preview_df = df.iloc[3:13].copy()  # Show 10 rows of actual data starting from row 4
             
             # Style the dataframe to highlight 4th column (D column) headers
             def highlight_4th_column(df):
@@ -101,9 +303,8 @@ def main():
             styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
             st.dataframe(styled_df, use_container_width=True)
             
-            # Show column headers info for 4th column
-            if len(df.columns) > 3:
-                st.info(f"**📌 Column D (4th column):** {df.columns[3]} - Headers are highlighted (contains structural information, not validated as data)")
+            # Show information about data structure
+            st.info(f"**📌 Data Structure:** First 3 rows contain headers/structural information and are excluded from validation. Column D (4th column): {df.columns[3] if len(df.columns) > 3 else 'N/A'} - highlighted for reference")
             st.markdown('</div>', unsafe_allow_html=True)
             
 
@@ -203,7 +404,60 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
         st.session_state.validation_results = results
     
     # Fireworks celebration effect
-        
+    st.markdown("""
+    <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
+        <div class="fireworks">
+            <div class="firework"></div>
+            <div class="firework"></div>
+            <div class="firework"></div>
+        </div>
+    </div>
+    
+    <style>
+    .fireworks {
+        position: relative;
+        width: 100%;
+        height: 100%;
+    }
+    
+    .firework {
+        position: absolute;
+        width: 4px;
+        height: 4px;
+        background: #ff6b6b;
+        border-radius: 50%;
+        animation: firework 2s ease-out;
+    }
+    
+    .firework:nth-child(1) {
+        left: 20%;
+        top: 30%;
+        animation-delay: 0s;
+        background: #4ecdc4;
+    }
+    
+    .firework:nth-child(2) {
+        left: 60%;
+        top: 20%;
+        animation-delay: 0.5s;
+        background: #45b7d1;
+    }
+    
+    .firework:nth-child(3) {
+        left: 80%;
+        top: 40%;
+        animation-delay: 1s;
+        background: #ff6b6b;
+    }
+    
+    @keyframes firework {
+        0% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(20); opacity: 0.7; }
+        100% { transform: scale(40); opacity: 0; }
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     st.success("✅ Validation completed! Results are ready for review.")
     time.sleep(2)  # Show fireworks for 2 seconds
     st.rerun()
@@ -287,3 +541,5 @@ def display_validation_results():
 
 if __name__ == "__main__":
     main()
+
+            
