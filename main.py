@@ -611,7 +611,6 @@ def display_validation_results():
     with col1:
         if st.button("📊 Download Detailed Report (Excel)", use_container_width=True):
             out = io.BytesIO()
-            # write excel with highlights
             with pd.ExcelWriter(out, engine='xlsxwriter') as writer:
                 full_df.to_excel(writer, index=False, sheet_name='Validation')
                 workbook = writer.book
@@ -635,7 +634,8 @@ def display_validation_results():
                     for ch in letter:
                         result = result * 26 + (ord(ch) - ord('A') + 1)
                     return result - 1
-highlight_map = {
+
+                highlight_map = {
                     'Banner_Error': ['F', 'G'],
                     'Address_Error': ['J', 'K'],
                     'Trade_Error': ['C'],
@@ -651,11 +651,9 @@ highlight_map = {
                             for letter in letters:
                                 cidx = col_index_for_letter(letter)
                                 if 0 <= cidx < full_df.shape[1]:
-                                    # write value back with red format
                                     try:
                                         worksheet.write(r + 1, cidx, full_df.iat[r, cidx], red_fmt)
                                     except Exception:
-                                        # if the original cell is not straightforward to write, skip silently
                                         pass
 
             data = out.getvalue()
