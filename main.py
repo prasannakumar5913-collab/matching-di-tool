@@ -539,5 +539,4 @@ def display_validation_results():
                 mime="text/csv"
             )
 
-if _name_ == "_main_":
-    main()
+
