@@ -1,19 +1,18 @@
-# app.py
 import streamlit as st
 import pandas as pd
-import io
-from validators import DataValidator
-from utils import format_validation_results, export_report
-import os
-import time
 
-# Set page configuration
-st.set_page_config(
-    page_title="Matching DI Tool",
-    page_icon="🔍",
-    layout="wide"
-)
+st.title("🔍 My Data Validation Tool")  # Tool name
 
+# Excel file uploader
+uploaded_file = st.file_uploader("📂 Upload your Excel file", type=["xlsx"])
+
+if uploaded_file is not None:
+    try:
+        df = pd.read_excel(uploaded_file)
+        st.write("✅ File uploaded successfully!")
+        st.dataframe(df)  # Show Excel content
+    except Exception as e:
+        st.error(f"Error reading Excel file: {e}")
 # Add custom CSS for animations and styling
 st.markdown("""
 <style>
