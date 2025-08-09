@@ -1,3 +1,4 @@
+import streamlit as st
 import pandas as pd
 import io
 from validators import DataValidator
@@ -265,7 +266,123 @@ def main():
             st.success(f"✅ File uploaded successfully! Found {len(df)} rows and {len(df.columns)} columns.")
             st.markdown('</div>', unsafe_allow_html=True)
             
+            # Display basic file information with animation
+            st.markdown('<div class="metric-container">', unsafe_allow_html=True)
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Rows", len(df), delta=None)
+            with col2:
+                st.metric("Data Rows", len(df) - 3 if len(df) > 3 else 0, delta=None)
+            with col3:
+                st.metric("Total Columns", len(df.columns), delta=None)
+            with col4:
+                st.metric("File Size", f"{uploaded_file.size / 1024:.1f} KB", delta=None)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            # Show data preview with animation
+            st.markdown('<div class="data-preview">', unsafe_allow_html=True)
+            st.subheader("📊 Data Preview")
+            
+            # Create a styled dataframe starting from row 4 (actual data rows)
+            # Skip first 3 rows as they contain headers/structural info
+            preview_df = df.iloc[3:13].copy()  # Show 10 rows of actual data starting from row 4
+            
+            # Style the dataframe to highlight 4th column (D column) headers
+            def highlight_4th_column(df):
+                # Create an empty style dataframe
+                styles = pd.DataFrame('', index=df.index, columns=df.columns)
+                
+                # If there's a 4th column (index 3), style it
+                if len(df.columns) > 3:
+                    # Bold the 4th column header and first row
+                    styles.iloc[:, 3] = 'font-weight: bold; background-color: #f0f2f6;'
+                
+                return styles
+            
+            # Display styled dataframe
+            styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
+            st.dataframe(styled_df, use_container_width=True)
+            
       
+            
+
+
+            # Validation settings with animation
+            st.markdown('<div class="validation-section">', unsafe_allow_html=True)
+            st.header("⚙ Validation Settings")
+            
+            # Primary validations
+            st.subheader("🎯 Primary Validations")
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown('<div class="checkbox-container">', unsafe_allow_html=True)
+                check_banner_mismatches = st.checkbox("Check Banner Mismatches (F vs G columns)", value=True, help="Uses LEFT(F,4)=LEFT(G,4) logic, skips blank G rows")
+                check_trade_errors = st.checkbox("Check Trade Errors (C column)", value=True, help="Validates C column contains only 05, 03, or 07")
+                check_address_column_mismatches = st.checkbox("Check Address Mismatches (J vs K columns)", value=True, help="Uses LEFT(J,4)=LEFT(K,4) logic, skips blank K rows")
+                st.markdown('</div>', unsafe_allow_html=True)
+            
+            with col2:
+                st.markdown('<div class="checkbox-container">', unsafe_allow_html=True)
+                check_z_code_errors = st.checkbox("Check Z Code Errors (AL column)", value=True, help="Validates AL column contains only 777750Z or 777796Z")
+                check_non_us_states = st.checkbox("Check Non-US States (O & P columns)", value=True, help="Checks columns O and P for non-US states")
+                st.markdown('</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+
+            
+
+            # Run validation button
+            if st.button("🚀 Run Validation", type="primary", use_container_width=True):
+                run_validation(
+                    df,
+                    check_banner_mismatches,
+                    check_trade_errors,
+                    check_address_column_mismatches,
+                    check_z_code_errors,
+                    check_non_us_states
+                )
+            
+        except Exception as e:
+            st.error(f"❌ Error reading Excel file: {str(e)}")
+            st.markdown("Please ensure the file is a valid Excel format (.xlsx or .xls).")
+    
+    # Display validation results if available
+    if st.session_state.validation_results is not None:
+        display_validation_results()
+
+def run_validation(df, check_banner, check_trade, check_address_cols, check_z_code, check_non_us):
+    """Run the data validation process"""
+    
+    # Animated progress bar
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    # Step 1: Initialize
+    status_text.text("🔧 Initializing validation engine...")
+    progress_bar.progress(20)
+    time.sleep(0.5)
+    
+    # Step 2: Load data
+    status_text.text("📊 Loading and analyzing data...")
+    progress_bar.progress(40)
+    time.sleep(0.5)
+    
+    # Step 3: Run validations
+    status_text.text("🔍 Running validation checks...")
+    progress_bar.progress(60)
+    time.sleep(0.5)
+    
+    with st.spinner("Processing validation results..."):
+        # Initialize validator
+        validator = DataValidator()
+        
+        # Run validations
+        results = validator.validate_data(
+            df, 
+            {},  # No column mapping needed for primary validations
+            {
+                'banner_mismatches': check_banner,
                 'trade_errors': check_trade,
                 'address_column_mismatches': check_address_cols,
                 'z_code_errors': check_z_code,
