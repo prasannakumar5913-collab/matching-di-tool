@@ -1,200 +1,47 @@
+import streamlit as st
 
-    /* Main title animation */
-    @keyframes fadeInDown {
-        from { opacity: 0; transform: translateY(-30px); }
-        to { opacity: 1; transform: translateY(0); }
+# Page config
+st.set_page_config(page_title="Matching DI Tool", page_icon="📊", layout="centered")
+
+# Hide Streamlit default menu & footer + Custom Styles
+st.markdown("""
+    <style>
+    /* Hide default Streamlit menu and footer */
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    header {visibility: hidden;}
+
+    /* Custom upload box */
+    .stFileUploader {
+        border: 2px dashed #6C63FF;
+        padding: 20px;
+        border-radius: 15px;
+        background-color: #fafafa;
     }
-    
-    @keyframes pulse {
-        0% { transform: scale(1); }
-        50% { transform: scale(1.05); }
-        100% { transform: scale(1); }
+    .stFileUploader:hover {
+        background-color: #f0f0ff;
     }
-    
-    @keyframes slideInLeft {
-        from { opacity: 0; transform: translateX(-50px); }
-        to { opacity: 1; transform: translateX(0); }
-    }
-    
-    @keyframes slideInRight {
-        from { opacity: 0; transform: translateX(50px); }
-        to { opacity: 1; transform: translateX(0); }
-    }
-    
-    @keyframes glow {
-        0% { box-shadow: 0 0 5px rgba(51, 51, 255, 0.3); }
-        50% { box-shadow: 0 0 20px rgba(51, 51, 255, 0.6); }
-        100% { box-shadow: 0 0 5px rgba(51, 51, 255, 0.3); }
-    }
-    
-    /* Apply animations to specific elements */
-    .main-title {
-        animation: fadeInDown 1s ease-out;
-    }
-    
-    .metric-container {
-        animation: slideInLeft 0.8s ease-out;
-        transition: transform 0.3s ease;
-    }
-    
-    .metric-container:hover {
-        transform: translateY(-5px);
-    }
-    
-    .validation-section {
-        animation: slideInRight 1s ease-out;
-    }
-    
-    .stButton > button {
-        animation: pulse 2s infinite;
-        transition: all 0.3s ease;
-        border-radius: 10px;
-        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
-        color: white;
-        border: none;
+
+    /* Title */
+    .title {
+        text-align: center;
+        font-size: 36px;
         font-weight: bold;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        color: #6C63FF;
+        margin-bottom: 10px;
     }
-    
-    .stButton > button:hover {
-        animation: none;
-        transform: translateY(-3px);
-        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
-    }
-    
-    .upload-area {
-        border: 3px dashed #4ECDC4;
-        border-radius: 15px;
-        padding: 20px;
+    .subtitle {
         text-align: center;
-        background: linear-gradient(135deg, rgba(78, 205, 196, 0.1), rgba(255, 107, 107, 0.1));
-        animation: glow 3s infinite;
-        transition: all 0.3s ease;
+        font-size: 16px;
+        color: #555;
+        margin-bottom: 30px;
     }
-    
-    .upload-area:hover {
-        transform: scale(1.02);
-        border-color: #FF6B6B;
-    }
-    
-    .success-animation {
-        animation: slideInLeft 0.5s ease-out;
-    }
-    
-    .checkbox-container {
-        transition: all 0.3s ease;
-        padding: 10px;
-        border-radius: 8px;
-    }
-    
-    .checkbox-container:hover {
-        background-color: rgba(78, 205, 196, 0.1);
-        transform: translateX(10px);
-    }
-    
-    .data-preview {
-        animation: fadeInDown 1.2s ease-out;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-    }
-    
-    /* Progress bar animation */
-    .stProgress > div > div {
-        background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1);
-        background-size: 300% 300%;
-        animation: gradientMove 2s ease infinite;
-    }
-    
-    @keyframes gradientMove {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    
-    /* Custom header styling */
-    .custom-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        background-clip: text;
-        font-size: 3.5rem;
-        font-weight: 900;
-        text-align: center;
-        margin-bottom: 1.5rem;
-        letter-spacing: 2px;
-        text-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    }
-    
-    .tool-name {
-        display: block;
-        position: relative;
-        text-align: center;
-        width: 100%;
-        margin: 0 auto 2rem auto;
-        padding: 20px 40px;
-        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
-        border-radius: 20px;
-        border: 2px solid transparent;
-        background-clip: padding-box;
-        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
-        backdrop-filter: blur(10px);
-    }
-    
-    .tool-name::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: linear-gradient(135deg, #667eea, #764ba2);
-        border-radius: 20px;
-        z-index: -1;
-        opacity: 0.1;
-        animation: borderGlow 3s ease-in-out infinite alternate;
-    }
-    
-    @keyframes borderGlow {
-        0% { opacity: 0.1; transform: scale(1); }
-        100% { opacity: 0.3; transform: scale(1.02); }
-    }
-    
-    /* Floating elements */
-    .floating-icon {
-        animation: float 3s ease-in-out infinite;
-    }
-    
-    @keyframes float {
-        0%, 100% { transform: translateY(0px); }
-        50% { transform: translateY(-10px); }
-    }
-    
-    /* Hide copy buttons throughout the app */
-    button[title="Copy to clipboard"] {
-        display: none !important;
-    }
-    
-    .copy-to-clipboard {
-        display: none !important;
-    }
-    
-    /* Light colored validation report styling */
-    .validation-summary {
-        background: linear-gradient(135deg, #f8f9ff 0%, #e8f4f8 100%);
-        border: 2px solid #d1e7f0;
-        border-radius: 15px;
-        padding: 20px;
-        margin: 15px 0;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-    }
-    
-    .validation-report-box {
-        background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
-        border: 1px solid #b3d9ff;
-        border-radius: 12px;
-        padding: 15px;
-        margin: 10px 0;
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Title section
+st.markdown("<div class='title'>📊 MATCHING DI TOOL</div>", unsafe_allow_html=True)
+st.markdown("<div class='subtitle'>Upload an Excel file to perform comprehensive data validation</div>", unsafe_allow_html=True)
+
+# File uploader
+uploaded_file = st.file_uploader("Drop your Excel file here", type=["xlsx", "xls"])
