@@ -1,27 +1,11 @@
 import streamlit as st
 import pandas as pd
 import io
+from utils import format_validation_results, export_report
+import os
 import time
 
-# Utility functions (previously in utils.py)
-def format_validation_results(results):
-    summary = []
-    for check, issues in results.items():
-        summary.append({'Check': check, 'Issues Found': len(issues)})
-    return pd.DataFrame(summary)
 
-def export_report(df, results):
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Data')
-        # Write each validation result in separate sheets
-        for check, issues in results.items():
-            if issues:
-                pd.DataFrame(issues).to_excel(writer, index=False, sheet_name=check[:31])
-            else:
-                pd.DataFrame(columns=['No issues found']).to_excel(writer, sheet_name=check[:31])
-    output.seek(0)
-    return output.getvalue()
 
 # Set page configuration
 st.set_page_config(
@@ -33,8 +17,205 @@ st.set_page_config(
 # Add custom CSS for animations and styling
 st.markdown("""
 <style>
-    /* (Your existing CSS from above here; omitted for brevity in this snippet) */
-    /* Copy-paste all your CSS styles here from your original code */
+    /* Main title animation */
+    @keyframes fadeInDown {
+        from { opacity: 0; transform: translateY(-30px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+        100% { transform: scale(1); }
+    }
+    
+    @keyframes slideInLeft {
+        from { opacity: 0; transform: translateX(-50px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    @keyframes slideInRight {
+        from { opacity: 0; transform: translateX(50px); }
+        to { opacity: 1; transform: translateX(0); }
+    }
+    
+    @keyframes glow {
+        0% { box-shadow: 0 0 5px rgba(51, 51, 255, 0.3); }
+        50% { box-shadow: 0 0 20px rgba(51, 51, 255, 0.6); }
+        100% { box-shadow: 0 0 5px rgba(51, 51, 255, 0.3); }
+    }
+    
+    /* Apply animations to specific elements */
+    .main-title {
+        animation: fadeInDown 1s ease-out;
+    }
+    
+    .metric-container {
+        animation: slideInLeft 0.8s ease-out;
+        transition: transform 0.3s ease;
+    }
+    
+    .metric-container:hover {
+        transform: translateY(-5px);
+    }
+    
+    .validation-section {
+        animation: slideInRight 1s ease-out;
+    }
+    
+    .stButton > button {
+        animation: pulse 2s infinite;
+        transition: all 0.3s ease;
+        border-radius: 10px;
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4);
+        color: white;
+        border: none;
+        font-weight: bold;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+    
+    .stButton > button:hover {
+        animation: none;
+        transform: translateY(-3px);
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+    }
+    
+    .upload-area {
+        border: 3px dashed #4ECDC4;
+        border-radius: 15px;
+        padding: 20px;
+        text-align: center;
+        background: linear-gradient(135deg, rgba(78, 205, 196, 0.1), rgba(255, 107, 107, 0.1));
+        animation: glow 3s infinite;
+        transition: all 0.3s ease;
+    }
+    
+    .upload-area:hover {
+        transform: scale(1.02);
+        border-color: #FF6B6B;
+    }
+    
+    .success-animation {
+        animation: slideInLeft 0.5s ease-out;
+    }
+    
+    .checkbox-container {
+        transition: all 0.3s ease;
+        padding: 10px;
+        border-radius: 8px;
+    }
+    
+    .checkbox-container:hover {
+        background-color: rgba(78, 205, 196, 0.1);
+        transform: translateX(10px);
+    }
+    
+    .data-preview {
+        animation: fadeInDown 1.2s ease-out;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+    }
+    
+    /* Progress bar animation */
+    .stProgress > div > div {
+        background: linear-gradient(45deg, #FF6B6B, #4ECDC4, #45B7D1);
+        background-size: 300% 300%;
+        animation: gradientMove 2s ease infinite;
+    }
+    
+    @keyframes gradientMove {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    
+    /* Custom header styling */
+    .custom-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        font-size: 3.5rem;
+        font-weight: 900;
+        text-align: center;
+        margin-bottom: 1.5rem;
+        letter-spacing: 2px;
+        text-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    
+    .tool-name {
+        display: block;
+        position: relative;
+        text-align: center;
+        width: 100%;
+        margin: 0 auto 2rem auto;
+        padding: 20px 40px;
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1), rgba(118, 75, 162, 0.1));
+        border-radius: 20px;
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.2);
+        backdrop-filter: blur(10px);
+    }
+    
+    .tool-name::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(135deg, #667eea, #764ba2);
+        border-radius: 20px;
+        z-index: -1;
+        opacity: 0.1;
+        animation: borderGlow 3s ease-in-out infinite alternate;
+    }
+    
+    @keyframes borderGlow {
+        0% { opacity: 0.1; transform: scale(1); }
+        100% { opacity: 0.3; transform: scale(1.02); }
+    }
+    
+    /* Floating elements */
+    .floating-icon {
+        animation: float 3s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translateY(0px); }
+        50% { transform: translateY(-10px); }
+    }
+    
+    /* Hide copy buttons throughout the app */
+    button[title="Copy to clipboard"] {
+        display: none !important;
+    }
+    
+    .copy-to-clipboard {
+        display: none !important;
+    }
+    
+    /* Light colored validation report styling */
+    .validation-summary {
+        background: linear-gradient(135deg, #f8f9ff 0%, #e8f4f8 100%);
+        border: 2px solid #d1e7f0;
+        border-radius: 15px;
+        padding: 20px;
+        margin: 15px 0;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+    
+    .validation-report-box {
+        background: linear-gradient(135deg, #f0f8ff 0%, #e6f3ff 100%);
+        border: 1px solid #b3d9ff;
+        border-radius: 12px;
+        padding: 15px;
+        margin: 10px 0;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -103,22 +284,35 @@ def main():
             st.markdown('<div class="data-preview">', unsafe_allow_html=True)
             st.subheader("📊 Data Preview")
             
+            # Create a styled dataframe starting from row 4 (actual data rows)
+            # Skip first 3 rows as they contain headers/structural info
             preview_df = df.iloc[3:13].copy()  # Show 10 rows of actual data starting from row 4
             
+            # Style the dataframe to highlight 4th column (D column) headers
             def highlight_4th_column(df):
+                # Create an empty style dataframe
                 styles = pd.DataFrame('', index=df.index, columns=df.columns)
+                
+                # If there's a 4th column (index 3), style it
                 if len(df.columns) > 3:
+                    # Bold the 4th column header and first row
                     styles.iloc[:, 3] = 'font-weight: bold; background-color: #f0f2f6;'
+                
                 return styles
             
+            # Display styled dataframe
             styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
             st.dataframe(styled_df, use_container_width=True)
-            st.markdown('</div>', unsafe_allow_html=True)
+            
+      
+            
+
 
             # Validation settings with animation
             st.markdown('<div class="validation-section">', unsafe_allow_html=True)
             st.header("⚙ Validation Settings")
             
+            # Primary validations
             st.subheader("🎯 Primary Validations")
             col1, col2 = st.columns(2)
             
@@ -135,6 +329,9 @@ def main():
                 check_non_us_states = st.checkbox("Check Non-US States (O & P columns)", value=True, help="Checks columns O and P for non-US states")
                 st.markdown('</div>', unsafe_allow_html=True)
             st.markdown('</div>', unsafe_allow_html=True)
+            
+
+            
 
             # Run validation button
             if st.button("🚀 Run Validation", type="primary", use_container_width=True):
@@ -155,6 +352,8 @@ def main():
     if st.session_state.validation_results is not None:
         display_validation_results()
 
+# ...existing code...
+
 def validate_data(df, checks):
     results = {}
 
@@ -164,7 +363,7 @@ def validate_data(df, checks):
         if df.shape[1] > 6:
             for idx, (f_val, g_val) in enumerate(zip(df.iloc[:, 5], df.iloc[:, 6])):
                 if pd.notna(g_val) and str(f_val)[:4] != str(g_val)[:4]:
-                    mismatches.append({'row': idx + 4, 'F': f_val, 'G': g_val})
+                    mismatches.append({'row': idx + 4, 'F': f_val, 'G': g_val})  # +4 for Excel row
         results['banner_mismatches'] = mismatches
 
     # 2. Trade errors (3rd column must be 05, 03, or 07)
@@ -211,24 +410,34 @@ def validate_data(df, checks):
 
     return results
 
+
 def run_validation(df, check_banner, check_trade, check_address_cols, check_z_code, check_non_us):
+    """Run the data validation process"""
+
+    # Animated progress bar
     progress_bar = st.progress(0)
     status_text = st.empty()
 
+    # Step 1: Initialize
     status_text.text("🔧 Initializing validation engine...")
     progress_bar.progress(20)
     time.sleep(0.5)
 
+    # Step 2: Load data
     status_text.text("📊 Loading and analyzing data...")
     progress_bar.progress(40)
     time.sleep(0.5)
 
+    # Step 3: Run validations
     status_text.text("🔍 Running validation checks...")
     progress_bar.progress(60)
     time.sleep(0.5)
 
     with st.spinner("Processing validation results..."):
-        data_df = df.iloc[3:]  # Skip first 3 rows as headers
+        # Use only data rows (skip first 3 if needed)
+        data_df = df.iloc[3:]  # adjust if your data starts at a different row
+
+        # Run validations
         results = validate_data(
             data_df,
             {
@@ -239,16 +448,19 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                 'non_us_states': check_non_us
             }
         )
+
+        # Complete progress
         status_text.text("✅ Validation completed successfully!")
         progress_bar.progress(100)
         time.sleep(0.5)
 
+        # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
 
         st.session_state.validation_results = results
 
-    # Fireworks effect
+    # Fireworks celebration effect
     st.markdown("""
     <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
         <div class="fireworks">
@@ -305,13 +517,16 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
 
     st.success("✅ Validation completed! Results are ready for review.")
     time.sleep(2)  # Show fireworks for 2 seconds
-    st.experimental_rerun()
+    st.rerun()
+
 
 def display_validation_results():
+    """Display the validation results"""
     results = st.session_state.validation_results
     
     st.header("📋 Validation Results")
     
+    # Summary metrics with light styling
     total_issues = sum(len(issues) for issues in results.values())
     
     st.markdown('<div class="validation-summary">', unsafe_allow_html=True)
@@ -325,6 +540,7 @@ def display_validation_results():
         issue_rate = (total_issues / len(st.session_state.uploaded_data)) * 100 if len(st.session_state.uploaded_data) > 0 else 0
         st.metric("Issue Rate", f"{issue_rate:.1f}%")
     with col4:
+        # Calculate clean records by getting unique row numbers with issues
         rows_with_issues = set()
         for issues in results.values():
             if issues:
@@ -337,6 +553,7 @@ def display_validation_results():
         st.metric("Clean Records", clean_records)
     st.markdown('</div>', unsafe_allow_html=True)
     
+    # Detailed results
     st.subheader("🔍 Detailed Issues")
     
     for check_type, issues in results.items():
@@ -345,17 +562,40 @@ def display_validation_results():
                 st.markdown('<div class="validation-report-box">', unsafe_allow_html=True)
                 if isinstance(issues, list) and len(issues) > 0:
                     if isinstance(issues[0], dict):
+                        # Display as DataFrame for structured data
                         issues_df = pd.DataFrame(issues)
                         st.dataframe(issues_df, use_container_width=True)
                     else:
+                        # Display as simple list
                         for i, issue in enumerate(issues, 1):
                             st.write(f"{i}. {issue}")
                 else:
                     st.write("No specific details available for these issues.")
                 st.markdown('</div>', unsafe_allow_html=True)
     
+    # Export functionality
     st.subheader("📤 Export Report")
     col1, col2 = st.columns(2)
     
     with col1:
-        if st.button("📊 Download Detailed Report", use_container_
+        if st.button("📊 Download Detailed Report", use_container_width=True):
+            report_data = export_report(st.session_state.uploaded_data, results)
+            st.download_button(
+                label="💾 Download Excel Report",
+                data=report_data,
+                file_name="validation_report.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+    
+    with col2:
+        if st.button("📋 Download Summary Report", use_container_width=True):
+            summary_report = format_validation_results(results)
+            st.download_button(
+                label="💾 Download Summary (CSV)",
+                data=summary_report.to_csv(index=False),
+                file_name="validation_summary.csv",
+                mime="text/csv"
+            )
+
+if __name__ == "__main__":
+    main()
