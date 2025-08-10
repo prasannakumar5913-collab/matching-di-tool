@@ -224,7 +224,7 @@ def main():
     <div class="tool-name main-title">
         <h1 class="custom-header">
             <span style="color: #667eea;">MATCHING</span>
-            <span style="color: #764ba2; margin-left: 15px;">QC</span>
+            <span style="color: #764ba2; margin-left: 15px;">DI</span>
             <span style="color: #667eea; margin-left: 15px;">TOOL</span>
         </h1>
     </div>
@@ -379,14 +379,14 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
         
         # Run validations
         results = validator.validate_data(
-            df, 
-            {},  # No column mapping needed for primary validations
+            df.iloc[3:],  # skip first 3 rows if needed
+            {},
             {
-                'banner_mismatches': check_banner,
-                'trade_errors': check_trade,
-                'address_column_mismatches': check_address_cols,
-                'z_code_errors': check_z_code,
-                'non_us_states': check_non_us
+            'banner_mismatches': check_banner,
+            'trade_errors': check_trade,
+            'address_column_mismatches': check_address_cols,
+            'z_code_errors': check_z_code,
+            'non_us_states': check_non_us
             }
         )
         
