@@ -87,9 +87,7 @@ def main():
             styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
             st.dataframe(styled_df, use_container_width=True)
 
-            if len(df.columns) > 3:
-                st.info(f"**📌 Column D (4th column):** {df.columns[3]} - Headers are highlighted (contains structural information, not validated as data)")
-
+          
             # Validation settings
             st.header("⚙️ Validation Settings")
             st.subheader("🎯 Primary Validations")
