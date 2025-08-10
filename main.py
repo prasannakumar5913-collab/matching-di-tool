@@ -1,15 +1,14 @@
 import streamlit as st
 import pandas as pd
 import io
+from validators import DataValidator
 from utils import format_validation_results, export_report
 import os
 import time
 
-
-
 # Set page configuration
 st.set_page_config(
-    page_title="Matching QC Tool",
+    page_title="Matching DI Tool",
     page_icon="🔍",
     layout="wide"
 )
@@ -304,13 +303,9 @@ def main():
             styled_df = preview_df.style.apply(highlight_4th_column, axis=None)
             st.dataframe(styled_df, use_container_width=True)
             
-      
-            
-
-
             # Validation settings with animation
             st.markdown('<div class="validation-section">', unsafe_allow_html=True)
-            st.header("⚙ Validation Settings")
+            st.header("⚙️ Validation Settings")
             
             # Primary validations
             st.subheader("🎯 Primary Validations")
@@ -352,100 +347,36 @@ def main():
     if st.session_state.validation_results is not None:
         display_validation_results()
 
-# ...existing code...
-def validate_data(self, df, params, checks):
-    results = {}
-
-    # For banner mismatches: compare LEFT(F,4) == LEFT(G,4), ignoring case and blank G
-    if checks.get('banner_mismatches', False):
-        mismatches = []
-        for idx, row in df.iterrows():
-            f_val = str(row.get('F', '')).strip()
-            g_val = str(row.get('G', '')).strip()
-            if g_val != '' and f_val[:4].lower() != g_val[:4].lower():
-                mismatches.append({
-                    'row': idx + 2,  # +2 if header row is at 0 and Excel is 1-indexed
-                    'F': f_val,
-                    'G': g_val,
-                    'AO': row.get('AO', ''),
-                    'AP': row.get('AP', '')
-                })
-        results['banner_mismatches'] = mismatches
-
-    # Trade errors: C column only 05, 03, or 07 allowed
-    if checks.get('trade_errors', False):
-        errors = []
-        for idx, val in df['C'].fillna('').iteritems():
-            if val not in ['05', '03', '07']:
-                errors.append({'row': idx + 2, 'C': val})
-        results['trade_errors'] = errors
-
-    # Address mismatches: LEFT(J,4) == LEFT(K,4), ignoring case and blank K
-    if checks.get('address_column_mismatches', False):
-        mismatches = []
-        for idx, row in df.iterrows():
-            j_val = str(row.get('J', '')).strip()
-            k_val = str(row.get('K', '')).strip()
-            if k_val != '' and j_val[:4].lower() != k_val[:4].lower():
-                mismatches.append({
-                    'row': idx + 2,
-                    'J': j_val,
-                    'K': k_val,
-                    'AO': row.get('AO', ''),
-                    'AP': row.get('AP', '')
-                })
-        results['address_column_mismatches'] = mismatches
-
-    # Z code errors: AL column only allowed '777750Z' or '777796Z', ignore blanks
-    if checks.get('z_code_errors', False):
-        errors = []
-        for idx, val in df['AL'].fillna('').iteritems():
-            if val not in ['777750Z', '777796Z', '']:
-                errors.append({'row': idx + 2, 'AL': val})
-        results['z_code_errors'] = errors
-
-    # Non-US States in O and P columns
-    if checks.get('non_us_states', False):
-        us_states = {...}  # set of US states codes
-        errors = []
-        for col in ['O', 'P']:
-            for idx, val in df[col].fillna('').iteritems():
-                if val != '' and val.upper() not in us_states:
-                    errors.append({'row': idx + 2, 'column': col, 'value': val})
-        results['non_us_states'] = errors
-
-    return results
-
-
 def run_validation(df, check_banner, check_trade, check_address_cols, check_z_code, check_non_us):
     """Run the data validation process"""
-
+    
     # Animated progress bar
     progress_bar = st.progress(0)
     status_text = st.empty()
-
+    
     # Step 1: Initialize
     status_text.text("🔧 Initializing validation engine...")
     progress_bar.progress(20)
     time.sleep(0.5)
-
+    
     # Step 2: Load data
     status_text.text("📊 Loading and analyzing data...")
     progress_bar.progress(40)
     time.sleep(0.5)
-
+    
     # Step 3: Run validations
     status_text.text("🔍 Running validation checks...")
     progress_bar.progress(60)
     time.sleep(0.5)
-
+    
     with st.spinner("Processing validation results..."):
-        # Use only data rows (skip first 3 if needed)
-        data_df = df.iloc[3:]  # adjust if your data starts at a different row
-
+        # Initialize validator
+        validator = DataValidator()
+        
         # Run validations
-        results = validate_data(
-            data_df,
+        results = validator.validate_data(
+            df, 
+            {},  # No column mapping needed for primary validations
             {
                 'banner_mismatches': check_banner,
                 'trade_errors': check_trade,
@@ -454,18 +385,18 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
                 'non_us_states': check_non_us
             }
         )
-
+        
         # Complete progress
         status_text.text("✅ Validation completed successfully!")
         progress_bar.progress(100)
         time.sleep(0.5)
-
+        
         # Clear progress indicators
         progress_bar.empty()
         status_text.empty()
-
+        
         st.session_state.validation_results = results
-
+    
     # Fireworks celebration effect
     st.markdown("""
     <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999;">
@@ -475,14 +406,14 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
             <div class="firework"></div>
         </div>
     </div>
-
+    
     <style>
     .fireworks {
         position: relative;
         width: 100%;
         height: 100%;
     }
-
+    
     .firework {
         position: absolute;
         width: 4px;
@@ -491,28 +422,28 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
         border-radius: 50%;
         animation: firework 2s ease-out;
     }
-
+    
     .firework:nth-child(1) {
         left: 20%;
         top: 30%;
         animation-delay: 0s;
         background: #4ecdc4;
     }
-
+    
     .firework:nth-child(2) {
         left: 60%;
         top: 20%;
         animation-delay: 0.5s;
         background: #45b7d1;
     }
-
+    
     .firework:nth-child(3) {
         left: 80%;
         top: 40%;
         animation-delay: 1s;
         background: #ff6b6b;
     }
-
+    
     @keyframes firework {
         0% { transform: scale(1); opacity: 1; }
         50% { transform: scale(20); opacity: 0.7; }
@@ -520,11 +451,10 @@ def run_validation(df, check_banner, check_trade, check_address_cols, check_z_co
     }
     </style>
     """, unsafe_allow_html=True)
-
+    
     st.success("✅ Validation completed! Results are ready for review.")
     time.sleep(2)  # Show fireworks for 2 seconds
     st.rerun()
-
 
 def display_validation_results():
     """Display the validation results"""
